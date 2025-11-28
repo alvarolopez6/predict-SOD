@@ -1,5 +1,6 @@
 // controllers/predictController.js
 const { getModelInfo, predict } = require("../services/tfModelService");
+const PredictionLog = require("../models_mongo/PredictionLog");
 
 function health(req, res) {
   res.json({
@@ -64,9 +65,27 @@ async function doPredict(req, res) {
     const latencyMs = Date.now() - start;
     const timestamp = new Date().toISOString();
 
-    // De momento sin MongoDB → predictionId null
+    try {
+      const newLog = new PredictionLog({
+        modelVersion: info.modelVersion,
+        latencyMs: latencyMs,
+        timestamp: timestamp,
+        features: features,
+        meta: meta,
+        prediction: prediction
+      });
+
+      const savedLog = await newLog.save();
+      predictionId = savedLog._id; 
+      
+      console.log(`Log de predicción guardado con ID: ${predictionId}`);
+
+    } catch (dbError) {
+      console.error("Advertencia: No se pudo guardar el log en MongoDB:", dbError.message);
+    }
+
     res.status(201).json({
-      predictionId: null,
+      predictionId: predictionId,
       prediction,
       timestamp,
       latencyMs
